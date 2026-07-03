@@ -1,0 +1,39 @@
+{
+  "name": "gobouncer",
+  "version": "0.1.0",
+  "description": "Drop-in rate limiting middleware for Node.js, backed by the GoBouncer Go service.",
+  "type": "commonjs",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "npm run build && node test.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "rate-limit",
+    "rate-limiter",
+    "express",
+    "middleware",
+    "redis",
+    "gobouncer"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "@types/node": "^20.14.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
