@@ -1,5 +1,6 @@
-import { Context } from "elysia";
+import { Context as ElysiaContext } from "elysia";
 import { FastifyRequest } from "fastify";
+import { Context as KoaContext } from "koa";
 
 /** Which rate limiting algorithm GoBouncer should use for this check. */
 export type Algorithm = "sliding_window" | "gcra";
@@ -65,7 +66,7 @@ export interface ElysiaLimitOptions {
   /** Window size in milliseconds. */
   windowMs: number;
   /** How to derive the key for this route. Defaults to limiting by IP. */
-  key?: (c: Context) => string;
+  key?: (c: ElysiaContext) => string;
   /** Which algorithm to use. Defaults to "sliding_window". */
   algorithm?: Algorithm;
 }
@@ -87,7 +88,7 @@ export interface KoaLimitOptions {
   /** Window size in milliseconds. */
   windowMs: number;
   /** How to derive the key for this route. Defaults to limiting by IP. */
-  key?: (ctx: Context) => string;
+  key?: (ctx: KoaContext) => string;
   /** Which algorithm to use. Defaults to "sliding_window". */
   algorithm?: Algorithm;
 }

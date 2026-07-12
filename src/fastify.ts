@@ -1,17 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { GoBouncerClient } from './index';
-import type { Algorithm } from './types';
+import type { FastifyLimitOptions } from './types';
 
-export interface FastifyLimitOptions {
-  /** Max requests allowed within the window. */
-  max: number;
-  /** Window size in milliseconds. */
-  windowMs: number;
-  /** How to derive the key for this route. Defaults to limiting by IP. */
-  key?: (req: FastifyRequest) => string;
-  /** Which algorithm to use. Defaults to "sliding_window". */
-  algorithm?: Algorithm;
-}
 
 /** Default key function — limits by client IP address. */
 export const fastifyIpKey = (req: FastifyRequest): string => {

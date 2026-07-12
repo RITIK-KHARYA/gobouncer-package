@@ -1,16 +1,5 @@
 import { GoBouncerClient } from './index';
-import type { Algorithm } from './types';
-
-export interface NextLimitOptions {
-  /** Max requests allowed within the window. */
-  max: number;
-  /** Window size in milliseconds. */
-  windowMs: number;
-  /** How to derive the key for this route. Defaults to limiting by IP. */
-  key?: (req: Request) => string;
-  /** Which algorithm to use. Defaults to "sliding_window". */
-  algorithm?: Algorithm;
-}
+import type { NextLimitOptions } from './types';
 
 /** Default key function — limits by client IP address. */
 export const nextIpKey = (req: Request): string => {

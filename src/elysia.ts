@@ -1,17 +1,6 @@
 import type { Context } from 'elysia';
 import { GoBouncerClient } from './index';
-import type { Algorithm } from './types';
-
-export interface ElysiaLimitOptions {
-  /** Max requests allowed within the window. */
-  max: number;
-  /** Window size in milliseconds. */
-  windowMs: number;
-  /** How to derive the key for this route. Defaults to limiting by IP. */
-  key?: (c: Context) => string;
-  /** Which algorithm to use. Defaults to "sliding_window". */
-  algorithm?: Algorithm;
-}
+import type { ElysiaLimitOptions } from './types';
 
 /** Default key function — limits by client IP address. */
 export const elysiaIpKey = (c: Context): string => {
@@ -31,6 +20,7 @@ export function elysiaHeaderKey(headerName: string) {
     return value ? `${lower}:${value}` : elysiaIpKey(c);
   };
 }
+
 
 /**
  * Create an Elysia rate-limiting beforeHandle hook from an existing GoBouncerClient.

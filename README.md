@@ -44,6 +44,9 @@ app.post(
 app.listen(3000)
 ```
 
+## Basic image support for overview 
+![sample middleware implementation](image.webp)
+
 ## API
 
 ### `gobouncer(options)`
