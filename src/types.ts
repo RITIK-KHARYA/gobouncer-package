@@ -1,3 +1,6 @@
+import { Context } from "elysia";
+import { FastifyRequest } from "fastify";
+
 /** Which rate limiting algorithm GoBouncer should use for this check. */
 export type Algorithm = "sliding_window" | "gcra";
 
@@ -40,6 +43,8 @@ export interface GoBouncerOptions {
   failOpen?: boolean;
   /** Optional shared secret sent as `X-GoBouncer-Key` header on every check call. */
   apiKey?: string;
+  /** Optional callback triggered when GoBouncer is unreachable or returns an error. */
+  onError?: (err: Error) => void;
 }
 
 /** Per-route options when calling `.limit(...)`. */
@@ -50,6 +55,59 @@ export interface LimitOptions<Req extends MinimalRequest = MinimalRequest> {
   windowMs: number;
   /** How to derive the key for this route. Defaults to limiting by IP. */
   key?: KeyFunc<Req>;
+  /** Which algorithm to use. Defaults to "sliding_window". */
+  algorithm?: Algorithm;
+}
+
+export interface ElysiaLimitOptions {
+  /** Max requests allowed within the window. */
+  max: number;
+  /** Window size in milliseconds. */
+  windowMs: number;
+  /** How to derive the key for this route. Defaults to limiting by IP. */
+  key?: (c: Context) => string;
+  /** Which algorithm to use. Defaults to "sliding_window". */
+  algorithm?: Algorithm;
+}
+
+export interface FastifyLimitOptions {
+  /** Max requests allowed within the window. */
+  max: number;
+  /** Window size in milliseconds. */
+  windowMs: number;
+  /** How to derive the key for this route. Defaults to limiting by IP. */
+  key?: (req: FastifyRequest) => string;
+  /** Which algorithm to use. Defaults to "sliding_window". */
+  algorithm?: Algorithm;
+}
+
+export interface KoaLimitOptions {
+  /** Max requests allowed within the window. */
+  max: number;
+  /** Window size in milliseconds. */
+  windowMs: number;
+  /** How to derive the key for this route. Defaults to limiting by IP. */
+  key?: (ctx: Context) => string;
+  /** Which algorithm to use. Defaults to "sliding_window". */
+  algorithm?: Algorithm;
+}
+
+export interface NextLimitOptions {
+  /** Max requests allowed within the window. */
+  max: number;
+  /** Window size in milliseconds. */
+  windowMs: number;
+  /** Which algorithm to use. Defaults to "sliding_window". */
+  algorithm?: Algorithm;
+}
+
+export interface NextLimitOptions {
+  /** Max requests allowed within the window. */
+  max: number;
+  /** Window size in milliseconds. */
+  windowMs: number;
+  /** How to derive the key for this route. Defaults to limiting by IP. */
+  key?: (req: Request) => string;
   /** Which algorithm to use. Defaults to "sliding_window". */
   algorithm?: Algorithm;
 }

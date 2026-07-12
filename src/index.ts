@@ -17,8 +17,6 @@ import {
   MinimalResponse,
 } from "./types";
 
-export * from "./types";
-
 // ── Default key function ──────────────────────────────────────────
 
 /** Default key function — limits by client IP address. */
@@ -37,16 +35,18 @@ export function headerKey(headerName: string): KeyFunc {
 // ── Client ─────────────────────────────────────────────────────────
 
 export class GoBouncerClient {
-  private readonly url: string;
-  private readonly timeoutMs: number;
-  private readonly failOpen: boolean;
-  private readonly apiKey?: string;
+  public readonly url: string;
+  public readonly timeoutMs: number;
+  public readonly failOpen: boolean;
+  public readonly apiKey?: string;
+  public readonly onError?: (err: Error) => void;
 
   constructor(opts: GoBouncerOptions) {
     this.url = opts.url.replace(/\/+$/, ""); // strip trailing slash
     this.timeoutMs = opts.timeoutMs ?? 150;
     this.failOpen = opts.failOpen ?? true;
     this.apiKey = opts.apiKey;
+    this.onError = opts.onError;
   }
 
   /**
@@ -78,13 +78,49 @@ export class GoBouncerClient {
       });
 
       if (!res.ok) {
+        const err = new Error(`GoBouncer returned status ${res.status}`);
+        if (this.onError) {
+          try { this.onError(err); } catch {}
+        }
         return this.fallback();
       }
 
       return (await res.json()) as CheckResult;
-    } catch {
+    } catch (err) {
+      if (this.onError) {
+        try {
+          this.onError(err instanceof Error ? err : new Error(String(err)));
+        } catch {}
+      }
       // network error, timeout, GoBouncer down, etc.
       return this.fallback();
+    }
+  }
+
+  /**
+   * Check connection to the GoBouncer service.
+   * Sends a ping/health request and returns true if online.
+   */
+  async ping(): Promise<boolean> {
+    try {
+      const headers: Record<string, string> = {};
+      if (this.apiKey) headers["X-GoBouncer-Key"] = this.apiKey;
+
+      const res = await fetch(`${this.url}/health`, {
+        method: "GET",
+        headers,
+        signal: AbortSignal.timeout(this.timeoutMs),
+      }).catch(async () => {
+        return fetch(`${this.url}/`, {
+          method: "GET",
+          headers,
+          signal: AbortSignal.timeout(this.timeoutMs),
+        });
+      });
+
+      return res.ok;
+    } catch {
+      return false;
     }
   }
 
@@ -118,6 +154,11 @@ export class GoBouncerClient {
 
       res.setHeader("X-RateLimit-Limit", opts.max);
       res.setHeader("X-RateLimit-Remaining", result.remaining);
+
+      if (result.retry_after !== undefined) {
+        const resetEpochSec = Math.ceil((Date.now() + result.retry_after) / 1000);
+        res.setHeader("X-RateLimit-Reset", resetEpochSec);
+      }
 
       if (!result.allowed) {
         const retryAfterSec = Math.max(

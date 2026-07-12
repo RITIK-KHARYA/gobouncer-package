@@ -1,21 +1,68 @@
 {
   "name": "gobouncer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Drop-in rate limiting middleware for Node.js, backed by the GoBouncer Go service.",
   "type": "commonjs",
   "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
       "require": "./dist/index.js"
+    },
+    "./hono": {
+      "types": "./dist/hono.d.ts",
+      "import": "./dist/hono.mjs",
+      "require": "./dist/hono.js"
+    },
+    "./fastify": {
+      "types": "./dist/fastify.d.ts",
+      "import": "./dist/fastify.mjs",
+      "require": "./dist/fastify.js"
+    },
+    "./koa": {
+      "types": "./dist/koa.d.ts",
+      "import": "./dist/koa.mjs",
+      "require": "./dist/koa.js"
+    },
+    "./next": {
+      "types": "./dist/next.d.ts",
+      "import": "./dist/next.mjs",
+      "require": "./dist/next.js"
+    },
+    "./elysia": {
+      "types": "./dist/elysia.d.ts",
+      "import": "./dist/elysia.mjs",
+      "require": "./dist/elysia.js"
     }
   },
   "files": [
     "dist"
   ],
+  "peerDependencies": {
+    "hono": ">=4.0.0",
+    "fastify": ">=4.0.0",
+    "koa": ">=2.0.0",
+    "elysia": ">=1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "hono": {
+      "optional": true
+    },
+    "fastify": {
+      "optional": true
+    },
+    "koa": {
+      "optional": true
+    },
+    "elysia": {
+      "optional": true
+    }
+  },
   "scripts": {
-    "build": "tsc",
+    "build": "tsup",
     "test": "npm run build && node test.js",
     "prepublishOnly": "npm run build"
   },
@@ -23,6 +70,7 @@
     "rate-limit",
     "rate-limiter",
     "express",
+    "hono",
     "middleware",
     "redis",
     "gobouncer"
@@ -30,10 +78,22 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "typescript": "^5.5.4",
-    "@types/node": "^20.14.0"
+    "@types/koa": "^3.0.3",
+    "@types/node": "^20.14.0",
+    "elysia": "^1.4.29",
+    "fastify": "^5.10.0",
+    "hono": "^4.12.28",
+    "koa": "^3.2.1",
+    "tsup": "^8.5.1",
+    "typescript": "^5.5.4"
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "bin": {
+    "gobouncer": "./bin/cli.js"
+  },
+  "dependencies": {
+    "makefile": "^0.0.2"
   }
 }
