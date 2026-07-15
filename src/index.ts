@@ -15,6 +15,8 @@ import {
   LimitOptions,
   MinimalRequest,
   MinimalResponse,
+  PolicyDefinition,
+  PolicyOptions,
 } from "./types";
 
 // ── Default key function ──────────────────────────────────────────
@@ -32,6 +34,10 @@ export function headerKey(headerName: string): KeyFunc {
   };
 }
 
+function normalizeAlgorithm(algorithm: PolicyDefinition["algorithm"]): Algorithm {
+  return algorithm === "sliding-window" ? "sliding_window" : algorithm ?? "sliding_window";
+}
+
 // ── Client ─────────────────────────────────────────────────────────
 
 export class GoBouncerClient {
@@ -40,6 +46,7 @@ export class GoBouncerClient {
   public readonly failOpen: boolean;
   public readonly apiKey?: string;
   public readonly onError?: (err: Error) => void;
+  public readonly policies: GoBouncerOptions["policies"];
 
   constructor(opts: GoBouncerOptions) {
     this.url = opts.url.replace(/\/+$/, ""); // strip trailing slash
@@ -47,6 +54,7 @@ export class GoBouncerClient {
     this.failOpen = opts.failOpen ?? true;
     this.apiKey = opts.apiKey;
     this.onError = opts.onError;
+    this.policies = opts.policies ?? {};
   }
 
   /**
@@ -59,6 +67,25 @@ export class GoBouncerClient {
     windowMs: number,
     algorithm: Algorithm = "sliding_window"
   ): Promise<CheckResult> {
+    return this.sendCheck({
+      key,
+      limit: max,
+      window_ms: windowMs,
+      algorithm,
+    });
+  }
+
+  /**
+   * Ask GoBouncer to check a key against a named server-side policy.
+   */
+  async checkPolicy(key: string, policy: string): Promise<CheckResult> {
+    return this.sendCheck({
+      key,
+      policy,
+    });
+  }
+
+  private async sendCheck(body: Record<string, unknown>): Promise<CheckResult> {
     try {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
@@ -68,24 +95,31 @@ export class GoBouncerClient {
       const res = await fetch(`${this.url}/check`, {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          key,
-          limit: max,
-          window_ms: windowMs,
-          algorithm,
-        }),
+        body: JSON.stringify(body),
         signal: AbortSignal.timeout(this.timeoutMs),
       });
 
       if (!res.ok) {
         const err = new Error(`GoBouncer returned status ${res.status}`);
         if (this.onError) {
-          try { this.onError(err); } catch {}
-        }
+          try { this.onError(err); } catch {
+            // Ignore errors in the error callback
+          }
+        } 
         return this.fallback();
       }
 
-      return (await res.json()) as CheckResult;
+      const result = (await res.json()) as CheckResult;
+      const limitHeader = res.headers?.get("X-RateLimit-Limit");
+      const policyHeader = res.headers?.get("X-RateLimit-Policy");
+
+      if (limitHeader !== null && limitHeader !== undefined) {
+        const parsed = Number(limitHeader);
+        if (Number.isFinite(parsed)) result.limit = parsed;
+      }
+      if (policyHeader) result.policy = policyHeader;
+
+      return result;
     } catch (err) {
       if (this.onError) {
         try {
@@ -175,6 +209,80 @@ export class GoBouncerClient {
 
       next();
     };
+  }
+
+  /**
+   * Express-style middleware for named GoBouncer policies.
+   *
+   * @example
+   * app.post('/login', client.policy({ name: 'login' }), loginHandler)
+   */
+  policy<Req extends MinimalRequest = MinimalRequest>(
+    opts: PolicyOptions<Req>
+  ) {
+    const keyFn = opts.key ?? (ipKey as KeyFunc<Req>);
+
+    return async (
+      req: Req,
+      res: MinimalResponse,
+      next: (err?: unknown) => void
+    ): Promise<void> => {
+      const key = keyFn(req);
+      const result = await this.checkPolicy(key, opts.name);
+
+      res.setHeader("X-RateLimit-Policy", result.policy ?? opts.name);
+      res.setHeader("X-RateLimit-Remaining", result.remaining);
+      if (result.limit !== undefined) {
+        res.setHeader("X-RateLimit-Limit", result.limit);
+      }
+
+      if (result.retry_after !== undefined) {
+        const resetEpochSec = Math.ceil((Date.now() + result.retry_after) / 1000);
+        res.setHeader("X-RateLimit-Reset", resetEpochSec);
+      }
+
+      if (!result.allowed) {
+        const retryAfterSec = Math.max(
+          1,
+          Math.ceil((result.retry_after ?? 0) / 1000)
+        );
+
+        res.setHeader("Retry-After", retryAfterSec);
+        res.status(429).json({
+          error: "too many requests",
+          retry_after_ms: result.retry_after ?? 0,
+        });
+        return;
+      }
+
+      next();
+    };
+  }
+
+  /**
+   * Express-style middleware for an application policy name.
+   * If the policy exists in `gobouncer({ policies })`, its local limit settings are used.
+   * Otherwise the name is sent to GoBouncer as a server-side named policy.
+   *
+   * @example
+   * app.get('/profile', client.use('profileRead'), handler)
+   */
+  use<Req extends MinimalRequest = MinimalRequest>(
+    name: string,
+    opts: Omit<PolicyOptions<Req>, "name"> = {}
+  ) {
+    const policy = this.policies?.[name];
+
+    if (!policy) {
+      return this.policy({ ...opts, name });
+    }
+
+    return this.limit({
+      max: policy.limit,
+      windowMs: policy.windowMs,
+      algorithm: normalizeAlgorithm(policy.algorithm),
+      key: opts.key,
+    });
   }
 }
 

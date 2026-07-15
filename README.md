@@ -14,6 +14,84 @@ Requires Node.js 18+ (uses the built-in `fetch`).
 
 ## Quick start
 
+Most apps should define rate-limit policies once and reuse them by name in routes.
+
+```js
+// policies.js
+module.exports = {
+  profileRead: {
+    algorithm: 'gcra',
+    limit: 100,
+    windowMs: 60_000,
+  },
+  otpVerify: {
+    algorithm: 'sliding-window',
+    limit: 5,
+    windowMs: 60_000,
+  },
+  paymentCreate: {
+    algorithm: 'gcra',
+    limit: 3,
+    windowMs: 60_000,
+  },
+}
+```
+
+```js
+// limiter.js
+const { gobouncer } = require('gobouncer')
+const policies = require('./policies')
+
+const limiter = gobouncer({
+  url: process.env.GOBOUNCER_URL ?? 'http://localhost:8080',
+  timeoutMs: 150,
+  failOpen: true,
+  apiKey: process.env.GOBOUNCER_API_KEY,
+  policies,
+})
+
+module.exports = { limiter }
+```
+
+```js
+// routes.js
+const express = require('express')
+const { limiter } = require('./limiter')
+
+const app = express()
+
+app.set('trust proxy', true)
+app.use(express.json())
+
+app.get('/profile', limiter.use('profileRead'), profileHandler)
+app.post('/verify-number', limiter.use('otpVerify'), verifyNumberHandler)
+app.post('/payment', limiter.use('paymentCreate'), paymentHandler)
+
+app.listen(3000)
+```
+
+`limiter.use('profileRead')` returns middleware. When the request is allowed, it calls `next()` and your handler runs. When the request is over the limit, it returns `429 Too Many Requests` and your handler does not run.
+
+You can also pass a custom key for authenticated routes:
+
+```js
+app.get(
+  '/dashboard',
+  limiter.use('profileRead', {
+    key: (req) => `user:${req.user.id}`,
+  }),
+  dashboardHandler
+)
+```
+
+If you keep policies inside the GoBouncer service instead of `policies.js`, use the same route style. When a policy name is not found in the local `policies` object, `limiter.use(name)` sends the name to GoBouncer as a server-side policy.
+
+```js
+app.post('/login', limiter.use('login'), loginHandler)
+```
+
+### Inline Express Example
+
 ```ts
 import express from 'express'
 import { gobouncer } from 'gobouncer'
@@ -26,17 +104,15 @@ const limiter = gobouncer({ url: 'http://localhost:8080' })
 // Apply globally — 100 requests per minute per IP
 app.use(limiter.limit({ max: 100, windowMs: 60_000 }))
 
-// Stricter limit on a sensitive route
-app.post('/login', limiter.limit({ max: 5, windowMs: 60_000 }), loginHandler)
+// Stricter limit on a sensitive route using a named GoBouncer policy
+app.post('/login', limiter.policy({ name: 'login' }), loginHandler)
 
 // Limit by authenticated user instead of IP
 app.post(
   '/api/ai/generate',
-  limiter.limit({
-    max: 10,
-    windowMs: 60_000,
+  limiter.policy({
+    name: 'user-free',
     key: (req) => `user:${req.user.id}`,
-    algorithm: 'gcra',
   }),
   generateHandler
 )
@@ -108,6 +184,67 @@ if (!result.allowed) {
 await emailQueue.add('send', jobData)
 ```
 
+### `limiter.checkPolicy(key, policy)`
+
+Call GoBouncer directly with a named policy configured in the GoBouncer service:
+
+```ts
+const result = await limiter.checkPolicy(`user:${userId}`, 'login')
+if (!result.allowed) {
+  throw new Error(`login limit reached, retry in ${result.retry_after}ms`)
+}
+```
+
+### `limiter.policy(options)`
+
+Returns an Express-style middleware using a named GoBouncer policy.
+
+```ts
+app.post('/otp', limiter.policy({
+  name: 'login',
+  key: (req) => `otp:${req.ip}:${req.body.phone}`,
+}), otpHandler)
+
+app.post('/login', limiter.policy({
+  name: 'login-route',
+  key: (req) => `route:/login:ip:${req.ip}`,
+}), loginHandler)
+```
+
+| Option | Type | Default | Description |
+| ------ | ---- | ------- | ----------- |
+| `name` | `string` | - | Named GoBouncer policy, such as `login`, `login-route`, `public-api`, or `user-free` |
+| `key` | `(req) => string` | limits by client IP | How to identify the caller |
+
+### `limiter.use(name, options?)`
+
+Returns Express middleware for a reusable application policy.
+
+```js
+const limiter = gobouncer({
+  url: 'http://localhost:8080',
+  policies: {
+    profileRead: { algorithm: 'gcra', limit: 100, windowMs: 60_000 },
+    otpVerify: { algorithm: 'sliding-window', limit: 5, windowMs: 60_000 },
+  },
+})
+
+app.get('/profile', limiter.use('profileRead'), profileHandler)
+app.post('/verify-number', limiter.use('otpVerify'), verifyNumberHandler)
+```
+
+If `name` exists in `policies`, GoBouncer receives an inline check using that policy's `limit`, `windowMs`, and `algorithm`.
+
+If `name` does not exist in `policies`, GoBouncer receives a named policy check:
+
+```js
+app.post('/login', limiter.use('login'), loginHandler)
+```
+
+| Option | Type | Default | Description |
+| ------ | ---- | ------- | ----------- |
+| `key` | `(req) => string` | limits by client IP | How to identify the caller |
+
 ### Built-in key helpers
 
 ```ts
@@ -132,7 +269,7 @@ The package ships a dedicated Hono adapter via the `gobouncer/hono` sub-path exp
 ```ts
 import { Hono } from 'hono'
 import { gobouncer } from 'gobouncer'
-import { honoLimit } from 'gobouncer/hono'
+import { honoLimit, honoPolicy } from 'gobouncer/hono'
 
 const app = new Hono()
 
@@ -141,8 +278,8 @@ const limiter = gobouncer({ url: 'http://localhost:8080' })
 // Global — 100 requests per minute per IP
 app.use('*', honoLimit(limiter, { max: 100, windowMs: 60_000 }))
 
-// Stricter limit on a sensitive route
-app.post('/login', honoLimit(limiter, { max: 5, windowMs: 60_000 }), loginHandler)
+// Stricter limit on a sensitive route using a named policy
+app.post('/login', honoPolicy(limiter, { name: 'login' }), loginHandler)
 
 // Limit by a custom header
 import { honoHeaderKey } from 'gobouncer/hono'
@@ -159,11 +296,9 @@ app.use(
 // Limit by authenticated user
 app.post(
   '/api/ai/generate',
-  honoLimit(limiter, {
-    max: 10,
-    windowMs: 60_000,
+  honoPolicy(limiter, {
+    name: 'user-free',
     key: (c) => `user:${c.req.header('x-user-id') ?? 'anon'}`,
-    algorithm: 'gcra',
   }),
   generateHandler
 )
@@ -182,6 +317,22 @@ Returns a Hono-compatible middleware `MiddlewareHandler`.
 | `key`       | `(c: Context) => string` | limits by client IP | How to identify the caller                |
 | `algorithm` | `'sliding_window'` \| `'gcra'` | `'sliding_window'`  | Which algorithm GoBouncer should use  |
 
+### `honoPolicy(client, options)`
+
+Returns a Hono-compatible middleware using a named GoBouncer policy.
+
+```ts
+app.post('/otp', honoPolicy(limiter, {
+  name: 'login',
+  key: (c) => `otp:${c.req.header('x-forwarded-for') ?? 'unknown'}`,
+}), otpHandler)
+```
+
+| Option | Type | Default | Description |
+| ------ | ---- | ------- | ----------- |
+| `name` | `string` | - | Named GoBouncer policy |
+| `key` | `(c: Context) => string` | limits by client IP | How to identify the caller |
+
 ### Hono key helpers
 
 ```ts
@@ -193,6 +344,110 @@ honoLimit(limiter, { max: 100, windowMs: 60_000, key: honoHeaderKey('X-API-Key')
 
 - **`honoIpKey(c)`** — reads `x-forwarded-for` → `x-real-ip` → `'unknown'`
 - **`honoHeaderKey(headerName)`** — reads the given header, falls back to `honoIpKey`
+
+---
+
+## Backend Boilerplates
+
+The pattern is the same in every backend framework:
+
+1. Run the GoBouncer service.
+2. Create one `limiter` client when your app starts.
+3. Attach middleware before the route handler.
+4. If allowed, the route handler runs. If denied, GoBouncer middleware returns `429`.
+
+### Express
+
+```js
+const express = require('express')
+const { gobouncer } = require('gobouncer')
+
+const app = express()
+const limiter = gobouncer({
+  url: process.env.GOBOUNCER_URL ?? 'http://localhost:8080',
+  policies: {
+    profileRead: { algorithm: 'gcra', limit: 100, windowMs: 60_000 },
+    otpVerify: { algorithm: 'sliding-window', limit: 5, windowMs: 60_000 },
+  },
+})
+
+app.get('/profile', limiter.use('profileRead'), handler)
+app.post('/verify-number', limiter.use('otpVerify'), handler)
+```
+
+### Hono
+
+```ts
+import { Hono } from 'hono'
+import { gobouncer } from 'gobouncer'
+import { honoLimit, honoPolicy } from 'gobouncer/hono'
+
+const app = new Hono()
+const limiter = gobouncer({ url: 'http://localhost:8080' })
+
+app.get('/profile', honoPolicy(limiter, { name: 'profileRead' }), handler)
+app.post('/verify-number', honoPolicy(limiter, { name: 'otpVerify' }), handler)
+app.use('/api/*', honoLimit(limiter, { max: 100, windowMs: 60_000 }))
+```
+
+### Fastify
+
+```ts
+import Fastify from 'fastify'
+import { gobouncer } from 'gobouncer'
+import { fastifyLimit } from 'gobouncer/fastify'
+
+const fastify = Fastify()
+const limiter = gobouncer({ url: 'http://localhost:8080' })
+
+fastify.get('/profile', {
+  preHandler: fastifyLimit(limiter, { max: 100, windowMs: 60_000 }),
+}, handler)
+```
+
+### Koa
+
+```ts
+import Koa from 'koa'
+import { gobouncer } from 'gobouncer'
+import { koaLimit } from 'gobouncer/koa'
+
+const app = new Koa()
+const limiter = gobouncer({ url: 'http://localhost:8080' })
+
+app.use(koaLimit(limiter, { max: 100, windowMs: 60_000 }))
+```
+
+### Next.js / Edge
+
+```ts
+import { NextResponse } from 'next/server'
+import { gobouncer } from 'gobouncer'
+import { nextLimit } from 'gobouncer/next'
+
+const limiter = gobouncer({ url: process.env.GOBOUNCER_URL! })
+const limit = nextLimit(limiter, { max: 100, windowMs: 60_000 })
+
+export async function middleware(req: Request) {
+  const blocked = await limit(req)
+  if (blocked) return blocked
+  return NextResponse.next()
+}
+```
+
+### Elysia
+
+```ts
+import { Elysia } from 'elysia'
+import { gobouncer } from 'gobouncer'
+import { elysiaLimit } from 'gobouncer/elysia'
+
+const limiter = gobouncer({ url: 'http://localhost:8080' })
+
+new Elysia().get('/profile', handler, {
+  beforeHandle: elysiaLimit(limiter, { max: 100, windowMs: 60_000 }),
+})
+```
 
 ---
 
@@ -245,4 +500,3 @@ new Elysia().get('/api', () => 'hi', {
 ## License
 
 MIT
-

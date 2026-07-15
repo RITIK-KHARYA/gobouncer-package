@@ -13,4 +13,12 @@ export interface HonoLimitOptions {
   algorithm?: Algorithm;
 }
 
+/** Per-route options when calling `honoPolicy(...)`. */
+export interface HonoPolicyOptions {
+  /** Named policy configured in the GoBouncer service, e.g. "login". */
+  name: string;
+  /** How to derive the key for this route. Defaults to limiting by IP. */
+  key?: HonoKeyFunc;
+}
+
 export type HonoKeyFunc = (c: Context) => string;

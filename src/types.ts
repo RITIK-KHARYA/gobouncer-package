@@ -5,6 +5,22 @@ import { Context as KoaContext } from "koa";
 /** Which rate limiting algorithm GoBouncer should use for this check. */
 export type Algorithm = "sliding_window" | "gcra";
 
+/** Policy algorithms accepted by the JS API. */
+export type PolicyAlgorithm = Algorithm | "sliding-window";
+
+/** A named policy declared by the application. */
+export interface PolicyDefinition {
+  /** Max requests allowed within the window. */
+  limit: number;
+  /** Window size in milliseconds. */
+  windowMs: number;
+  /** Which algorithm to use. Defaults to "sliding_window". */
+  algorithm?: PolicyAlgorithm;
+}
+
+/** A map of application policy names to policy settings. */
+export type PolicyRegistry = Record<string, PolicyDefinition>;
+
 /** Minimal request shape we depend on — works with Express, Fastify (via req.raw), etc. */
 export interface MinimalRequest {
   ip?: string;
@@ -25,6 +41,9 @@ export type KeyFunc<Req extends MinimalRequest = MinimalRequest> = (
 
 /** The result GoBouncer returns for a single check. */
 export interface CheckResult {
+  key?: string;
+  policy?: string;
+  limit?: number;
   allowed: boolean;
   remaining: number;
   retry_after?: number; // milliseconds
@@ -46,6 +65,8 @@ export interface GoBouncerOptions {
   apiKey?: string;
   /** Optional callback triggered when GoBouncer is unreachable or returns an error. */
   onError?: (err: Error) => void;
+  /** Optional application-side named policies for `.use(name)`. */
+  policies?: PolicyRegistry;
 }
 
 /** Per-route options when calling `.limit(...)`. */
@@ -58,6 +79,14 @@ export interface LimitOptions<Req extends MinimalRequest = MinimalRequest> {
   key?: KeyFunc<Req>;
   /** Which algorithm to use. Defaults to "sliding_window". */
   algorithm?: Algorithm;
+}
+
+/** Per-route options when calling `.policy(...)`. */
+export interface PolicyOptions<Req extends MinimalRequest = MinimalRequest> {
+  /** Named policy configured in the GoBouncer service, e.g. "login". */
+  name: string;
+  /** How to derive the key for this route. Defaults to limiting by IP. */
+  key?: KeyFunc<Req>;
 }
 
 export interface ElysiaLimitOptions {

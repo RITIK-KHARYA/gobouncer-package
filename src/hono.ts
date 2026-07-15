@@ -16,7 +16,7 @@
 
 import type { Context, Next, MiddlewareHandler } from 'hono';
 import { GoBouncerClient } from './index';
-import type { HonoKeyFunc, HonoLimitOptions } from './types-hono';
+import type { HonoKeyFunc, HonoLimitOptions, HonoPolicyOptions } from './types-hono';
 
 /** Default key — extract client IP from standard proxy headers. */
 export const honoIpKey: HonoKeyFunc = (c) => {
@@ -67,6 +67,46 @@ export function honoLimit(
 
     c.header('X-RateLimit-Limit', String(opts.max));
     c.header('X-RateLimit-Remaining', String(result.remaining));
+
+    if (result.retry_after !== undefined) {
+      const resetEpochSec = Math.ceil((Date.now() + result.retry_after) / 1000);
+      c.header('X-RateLimit-Reset', String(resetEpochSec));
+    }
+
+    if (!result.allowed) {
+      const retryAfterSec = Math.max(1, Math.ceil((result.retry_after ?? 0) / 1000));
+      c.header('Retry-After', String(retryAfterSec));
+      return c.json(
+        { error: 'too many requests', retry_after_ms: result.retry_after ?? 0 },
+        429
+      );
+    }
+
+    await next();
+  };
+}
+
+/**
+ * Create a Hono middleware from a named GoBouncer policy.
+ *
+ * @example
+ * app.post('/login', honoPolicy(limiter, { name: 'login' }), loginHandler)
+ */
+export function honoPolicy(
+  client: GoBouncerClient,
+  opts: HonoPolicyOptions
+): MiddlewareHandler {
+  const keyFn = opts.key ?? honoIpKey;
+
+  return async (c: Context, next: Next) => {
+    const key = keyFn(c);
+    const result = await client.checkPolicy(key, opts.name);
+
+    c.header('X-RateLimit-Policy', result.policy ?? opts.name);
+    c.header('X-RateLimit-Remaining', String(result.remaining));
+    if (result.limit !== undefined) {
+      c.header('X-RateLimit-Limit', String(result.limit));
+    }
 
     if (result.retry_after !== undefined) {
       const resetEpochSec = Math.ceil((Date.now() + result.retry_after) / 1000);

@@ -90,6 +90,48 @@ test("GoBouncerClient.check() handles fetch error with failOpen", async (t) => {
   assert.deepStrictEqual(result, { allowed: true, remaining: -1 });
 });
 
+test("GoBouncerClient.checkPolicy() makes successful HTTP post", async (t) => {
+  const client = gobouncer({ url: "http://localhost:8080", apiKey: "secret" });
+
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  globalThis.fetch = async (input, init) => {
+    assert.strictEqual(input, "http://localhost:8080/check");
+    assert.strictEqual(init.method, "POST");
+    assert.strictEqual(init.headers["Content-Type"], "application/json");
+    assert.strictEqual(init.headers["X-GoBouncer-Key"], "secret");
+
+    const body = JSON.parse(init.body);
+    assert.deepStrictEqual(body, {
+      key: "user:123",
+      policy: "login",
+    });
+
+    return {
+      ok: true,
+      headers: {
+        get(name) {
+          if (name === "X-RateLimit-Limit") return "5";
+          if (name === "X-RateLimit-Policy") return "login";
+          return null;
+        },
+      },
+      json: async () => ({ allowed: true, remaining: 4 }),
+    };
+  };
+
+  const result = await client.checkPolicy("user:123", "login");
+  assert.deepStrictEqual(result, {
+    allowed: true,
+    remaining: 4,
+    limit: 5,
+    policy: "login",
+  });
+});
+
 test("GoBouncerClient.limit() middleware allowed flow", async (t) => {
   const client = gobouncer({ url: "http://localhost:8080" });
   
@@ -165,9 +207,151 @@ test("GoBouncerClient.limit() middleware denied flow", async (t) => {
   });
 });
 
+test("GoBouncerClient.policy() middleware allowed flow", async () => {
+  const client = gobouncer({ url: "http://localhost:8080" });
+  client.checkPolicy = async () => ({
+    allowed: true,
+    remaining: 4,
+    limit: 5,
+    policy: "login",
+  });
+
+  const middleware = client.policy({ name: "login" });
+
+  const req = { ip: "1.2.3.4", headers: {} };
+  const headersSet = {};
+  const res = {
+    setHeader(name, value) {
+      headersSet[name] = value;
+    },
+    status() { return this; },
+    json() { return this; },
+  };
+
+  let nextCalled = false;
+  await middleware(req, res, () => { nextCalled = true; });
+
+  assert.strictEqual(nextCalled, true);
+  assert.strictEqual(headersSet["X-RateLimit-Policy"], "login");
+  assert.strictEqual(headersSet["X-RateLimit-Limit"], 5);
+  assert.strictEqual(headersSet["X-RateLimit-Remaining"], 4);
+});
+
+test("GoBouncerClient.policy() middleware denied flow", async () => {
+  const client = gobouncer({ url: "http://localhost:8080" });
+  client.checkPolicy = async () => ({
+    allowed: false,
+    remaining: 0,
+    retry_after: 5000,
+    policy: "login",
+  });
+
+  const middleware = client.policy({
+    name: "login",
+    key: (req) => `login:${req.ip}`,
+  });
+
+  const req = { ip: "1.2.3.4", headers: {} };
+  const headersSet = {};
+  let responseStatus = 0;
+  let responseBody = null;
+  const res = {
+    setHeader(name, value) {
+      headersSet[name] = value;
+    },
+    status(code) {
+      responseStatus = code;
+      return this;
+    },
+    json(body) {
+      responseBody = body;
+      return this;
+    },
+  };
+
+  let nextCalled = false;
+  await middleware(req, res, () => { nextCalled = true; });
+
+  assert.strictEqual(nextCalled, false);
+  assert.strictEqual(headersSet["X-RateLimit-Policy"], "login");
+  assert.strictEqual(headersSet["X-RateLimit-Remaining"], 0);
+  assert.strictEqual(headersSet["Retry-After"], 5);
+  assert.strictEqual(responseStatus, 429);
+  assert.deepStrictEqual(responseBody, {
+    error: "too many requests",
+    retry_after_ms: 5000,
+  });
+});
+
+test("GoBouncerClient.use() applies local policy settings", async () => {
+  const client = gobouncer({
+    url: "http://localhost:8080",
+    policies: {
+      profileRead: { algorithm: "gcra", limit: 100, windowMs: 60000 },
+      otpVerify: { algorithm: "sliding-window", limit: 5, windowMs: 60000 },
+    },
+  });
+
+  let captured = null;
+  client.check = async (key, max, windowMs, algorithm) => {
+    captured = { key, max, windowMs, algorithm };
+    return { allowed: true, remaining: 99 };
+  };
+
+  const middleware = client.use("profileRead", {
+    key: (req) => `user:${req.headers["x-user-id"]}`,
+  });
+
+  const req = { ip: "1.2.3.4", headers: { "x-user-id": "user_123" } };
+  const res = {
+    setHeader() {},
+    status() { return this; },
+    json() { return this; },
+  };
+
+  let nextCalled = false;
+  await middleware(req, res, () => { nextCalled = true; });
+
+  assert.strictEqual(nextCalled, true);
+  assert.deepStrictEqual(captured, {
+    key: "user:user_123",
+    max: 100,
+    windowMs: 60000,
+    algorithm: "gcra",
+  });
+});
+
+test("GoBouncerClient.use() falls back to server-side named policy", async () => {
+  const client = gobouncer({ url: "http://localhost:8080" });
+
+  let captured = null;
+  client.checkPolicy = async (key, policy) => {
+    captured = { key, policy };
+    return { allowed: true, remaining: 4, policy };
+  };
+
+  const middleware = client.use("login");
+
+  const req = { ip: "1.2.3.4", headers: {} };
+  const res = {
+    setHeader() {},
+    status() { return this; },
+    json() { return this; },
+  };
+
+  let nextCalled = false;
+  await middleware(req, res, () => { nextCalled = true; });
+
+  assert.strictEqual(nextCalled, true);
+  assert.deepStrictEqual(captured, {
+    key: "ip:1.2.3.4",
+    policy: "login",
+  });
+});
+
 // ── Hono middleware tests ─────────────────────────────────────────
 
-const { honoLimit, honoIpKey, honoHeaderKey } = require("./dist/hono.js");
+const { honoLimit, honoPolicy, honoIpKey, honoHeaderKey } = require("./dist/hono.js");
 
 /**
  * Create a minimal mock of Hono's Context object.
@@ -309,6 +493,58 @@ test("honoLimit uses custom algorithm", async () => {
   await middleware(c, async () => {});
 
   assert.strictEqual(capturedAlgorithm, "gcra");
+});
+
+test("honoPolicy allowed flow", async () => {
+  const client = gobouncer({ url: "http://localhost:8080" });
+  client.checkPolicy = async () => ({
+    allowed: true,
+    remaining: 4,
+    limit: 5,
+    policy: "login",
+  });
+
+  const middleware = honoPolicy(client, { name: "login" });
+
+  const c = createMockContext({ "x-forwarded-for": "10.0.0.1" });
+  let nextCalled = false;
+  await middleware(c, async () => { nextCalled = true; });
+
+  assert.strictEqual(nextCalled, true);
+  assert.strictEqual(c._responseHeaders["X-RateLimit-Policy"], "login");
+  assert.strictEqual(c._responseHeaders["X-RateLimit-Limit"], "5");
+  assert.strictEqual(c._responseHeaders["X-RateLimit-Remaining"], "4");
+});
+
+test("honoPolicy denied flow", async () => {
+  const client = gobouncer({ url: "http://localhost:8080" });
+  client.checkPolicy = async () => ({
+    allowed: false,
+    remaining: 0,
+    retry_after: 3000,
+    policy: "login",
+  });
+
+  const middleware = honoPolicy(client, {
+    name: "login",
+    key: (c) => `login:${c.req.header("x-user-id") ?? "anon"}`,
+  });
+
+  const c = createMockContext({ "x-user-id": "user_123" });
+  let nextCalled = false;
+  await middleware(c, async () => { nextCalled = true; });
+
+  assert.strictEqual(nextCalled, false);
+  assert.strictEqual(c._responseHeaders["X-RateLimit-Policy"], "login");
+  assert.strictEqual(c._responseHeaders["X-RateLimit-Remaining"], "0");
+  assert.strictEqual(c._responseHeaders["Retry-After"], "3");
+
+  const jsonResult = c._getJsonResult();
+  assert.strictEqual(jsonResult.status, 429);
+  assert.deepStrictEqual(jsonResult.body, {
+    error: "too many requests",
+    retry_after_ms: 3000,
+  });
 });
 
 // ── New Tests for Phase 2 DX & Observability ───────────────────────
@@ -726,6 +962,3 @@ test("elysiaLimit denied flow", async () => {
   assert.strictEqual(responseHeaders["Retry-After"], "3");
   assert.ok(responseHeaders["X-RateLimit-Reset"]);
 });
-
-
-
