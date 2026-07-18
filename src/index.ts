@@ -38,6 +38,10 @@ function normalizeAlgorithm(algorithm: PolicyDefinition["algorithm"]): Algorithm
   return algorithm === "sliding-window" ? "sliding_window" : algorithm ?? "sliding_window";
 }
 
+function namespacedKey(policyName: string, algorithm: Algorithm, key: string): string {
+  return `ratelimit:${policyName}:${algorithm}:${key}`;
+}
+
 // ── Client ─────────────────────────────────────────────────────────
 
 export class GoBouncerClient {
@@ -277,11 +281,14 @@ export class GoBouncerClient {
       return this.policy({ ...opts, name });
     }
 
+    const algorithm = normalizeAlgorithm(policy.algorithm);
+    const keyFn = opts.key ?? (ipKey as KeyFunc<Req>);
+
     return this.limit({
       max: policy.limit,
       windowMs: policy.windowMs,
-      algorithm: normalizeAlgorithm(policy.algorithm),
-      key: opts.key,
+      algorithm,
+      key: (req: Req) => namespacedKey(name, algorithm, keyFn(req)),
     });
   }
 }

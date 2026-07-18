@@ -314,11 +314,43 @@ test("GoBouncerClient.use() applies local policy settings", async () => {
 
   assert.strictEqual(nextCalled, true);
   assert.deepStrictEqual(captured, {
-    key: "user:user_123",
+    key: "ratelimit:profileRead:gcra:user:user_123",
     max: 100,
     windowMs: 60000,
     algorithm: "gcra",
   });
+});
+
+test("GoBouncerClient.use() namespaces same user across different policies", async () => {
+  const client = gobouncer({
+    url: "http://localhost:8080",
+    policies: {
+      profileRead: { algorithm: "gcra", limit: 100, windowMs: 60000 },
+      otpVerify: { algorithm: "sliding-window", limit: 5, windowMs: 60000 },
+    },
+  });
+
+  const capturedKeys = [];
+  client.check = async (key) => {
+    capturedKeys.push(key);
+    return { allowed: true, remaining: 1 };
+  };
+
+  const req = { ip: "1.2.3.4", headers: { "x-user-id": "42" } };
+  const res = {
+    setHeader() {},
+    status() { return this; },
+    json() { return this; },
+  };
+  const key = (request) => `user:${request.headers["x-user-id"]}`;
+
+  await client.use("profileRead", { key })(req, res, () => {});
+  await client.use("otpVerify", { key })(req, res, () => {});
+
+  assert.deepStrictEqual(capturedKeys, [
+    "ratelimit:profileRead:gcra:user:42",
+    "ratelimit:otpVerify:sliding_window:user:42",
+  ]);
 });
 
 test("GoBouncerClient.use() falls back to server-side named policy", async () => {

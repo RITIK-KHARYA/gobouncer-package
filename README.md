@@ -18,6 +18,7 @@ Most apps should define rate-limit policies once and reuse them by name in route
 
 ```js
 // policies.js
+// you can write custom configuration with your requirement
 module.exports = {
   profileRead: {
     algorithm: 'gcra',
@@ -71,6 +72,31 @@ app.listen(3000)
 ```
 
 `limiter.use('profileRead')` returns middleware. When the request is allowed, it calls `next()` and your handler runs. When the request is over the limit, it returns `429 Too Many Requests` and your handler does not run.
+
+For local policies, keys are automatically namespaced before they are sent to GoBouncer:
+
+```text
+ratelimit:{policyName}:{algorithm}:{key}
+```
+
+So these two routes do not collide in Redis even if both key on `user:42`:
+
+```js
+app.get('/profile', limiter.use('profileRead', {
+  key: () => 'user:42',
+}), profileHandler)
+
+app.post('/verify-number', limiter.use('otpVerify', {
+  key: () => 'user:42',
+}), verifyNumberHandler)
+```
+
+They become separate rate-limit keys:
+
+```text
+ratelimit:profileRead:gcra:user:42
+ratelimit:otpVerify:sliding_window:user:42
+```
 
 You can also pass a custom key for authenticated routes:
 
@@ -240,6 +266,14 @@ If `name` does not exist in `policies`, GoBouncer receives a named policy check:
 ```js
 app.post('/login', limiter.use('login'), loginHandler)
 ```
+
+For server-side policies, the GoBouncer service should namespace Redis keys after resolving the policy:
+
+```text
+ratelimit:{policyName}:{algorithm}:{key}
+```
+
+That keeps policies like `profileRead` and `otpVerify` isolated even when both use the same logical key, such as `user:42`.
 
 | Option | Type | Default | Description |
 | ------ | ---- | ------- | ----------- |
