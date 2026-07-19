@@ -3,3 +3,5 @@
 This API reference is generated from the TypeScript source with TypeDoc.
 
 For setup, recipes, and framework examples, start with the root README. Use this section when you need the exact exported functions, option types, and adapter APIs.
+
+Python backends can use the Python package in this repository. See `docs/python.md` for FastAPI, Flask, and Django examples.

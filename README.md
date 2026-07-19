@@ -6,11 +6,25 @@ GoBouncer itself runs as a small, fast Go service backed by Redis. This package 
 
 ## Install
 
+Node.js:
+
 ```bash
 npm install gobouncer
 ```
 
 Requires Node.js 18+ (uses the built-in `fetch`).
+
+Python:
+
+```bash
+pip install -e .
+```
+
+After the Python package is published to PyPI:
+
+```bash
+pip install gobouncer
+```
 
 ## Quick start
 
@@ -157,6 +171,8 @@ Generated API docs live in [`docs/api`](docs/api/index.html). Regenerate them wi
 npm run docs
 ```
 
+Python users can install the Python package from this repo with `pip install -e .`; after PyPI publishing, this becomes `pip install gobouncer`. See the Python backend guide in [`docs/python.md`](docs/python.md) for FastAPI, Flask, and Django examples.
+
 ## Maintainer Workflow
 
 Before publishing, verify the package contents:
@@ -174,6 +190,14 @@ npm run release
 ```
 
 On `main`, the release workflow opens a version PR when changesets exist. After that PR is merged, it publishes to npm and creates the GitHub release.
+
+Python package builds use:
+
+```bash
+python -m build --outdir python-dist
+```
+
+The `python-release` workflow can be run manually to publish the Python package to PyPI after PyPI trusted publishing is configured.
 
 ## API
 

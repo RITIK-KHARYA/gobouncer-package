@@ -16,7 +16,7 @@
 </div></section>
 <div class="tsd-signature"><span class="tsd-signature-keyword">interface</span> <span class="tsd-kind-interface">GoBouncerOptions</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-property" href="#apikey">apiKey</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#failopen">failOpen</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#onerror">onError</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">err</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Error</span><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#policies">policies</a><span class="tsd-signature-symbol">?:</span> <a href="../types/types.PolicyRegistry.html" class="tsd-signature-type tsd-kind-type-alias">PolicyRegistry</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#timeoutms">timeoutMs</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#url">url</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/RITIK-KHARYA/gobouncer-package/blob/191a34de3c36a1da81727116b6e24860fe713a26/src/types.ts#L53">src/types.ts:53</a></li></ul></aside>
+<li>Defined in <a href="https://github.com/RITIK-KHARYA/gobouncer-package/blob/ee4f2b7f171c47798f106433d571aa8041316e26/src/types.ts#L53">src/types.ts:53</a></li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -40,7 +40,7 @@
 <div class="tsd-comment tsd-typography"><p>Optional shared secret sent as <code>X-GoBouncer-Key</code> header on every check call.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/RITIK-KHARYA/gobouncer-package/blob/191a34de3c36a1da81727116b6e24860fe713a26/src/types.ts#L65">src/types.ts:65</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/RITIK-KHARYA/gobouncer-package/blob/ee4f2b7f171c47798f106433d571aa8041316e26/src/types.ts#L65">src/types.ts:65</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="failopen"><code class="tsd-tag">Optional</code><span>fail<wbr/>Open</span><a href="#failopen" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">failOpen</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span></div>
@@ -49,35 +49,35 @@ true  (default) - allow the request through (availability over strictness)
 false           - deny the request (strictness over availability)</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/RITIK-KHARYA/gobouncer-package/blob/191a34de3c36a1da81727116b6e24860fe713a26/src/types.ts#L63">src/types.ts:63</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/RITIK-KHARYA/gobouncer-package/blob/ee4f2b7f171c47798f106433d571aa8041316e26/src/types.ts#L63">src/types.ts:63</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="onerror"><code class="tsd-tag">Optional</code><span>on<wbr/>Error</span><a href="#onerror" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">onError</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">err</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Error</span><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-comment tsd-typography"><p>Optional callback triggered when GoBouncer is unreachable or returns an error.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/RITIK-KHARYA/gobouncer-package/blob/191a34de3c36a1da81727116b6e24860fe713a26/src/types.ts#L67">src/types.ts:67</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/RITIK-KHARYA/gobouncer-package/blob/ee4f2b7f171c47798f106433d571aa8041316e26/src/types.ts#L67">src/types.ts:67</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="policies"><code class="tsd-tag">Optional</code><span>policies</span><a href="#policies" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">policies</span><span class="tsd-signature-symbol">?:</span> <a href="../types/types.PolicyRegistry.html" class="tsd-signature-type tsd-kind-type-alias">PolicyRegistry</a></div>
 <div class="tsd-comment tsd-typography"><p>Optional application-side named policies for <code>.use(name)</code>.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/RITIK-KHARYA/gobouncer-package/blob/191a34de3c36a1da81727116b6e24860fe713a26/src/types.ts#L69">src/types.ts:69</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/RITIK-KHARYA/gobouncer-package/blob/ee4f2b7f171c47798f106433d571aa8041316e26/src/types.ts#L69">src/types.ts:69</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="timeoutms"><code class="tsd-tag">Optional</code><span>timeout<wbr/>Ms</span><a href="#timeoutms" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">timeoutMs</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>Max time to wait for GoBouncer to respond, in ms. Default: 150.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/RITIK-KHARYA/gobouncer-package/blob/191a34de3c36a1da81727116b6e24860fe713a26/src/types.ts#L57">src/types.ts:57</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/RITIK-KHARYA/gobouncer-package/blob/ee4f2b7f171c47798f106433d571aa8041316e26/src/types.ts#L57">src/types.ts:57</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="url"><span>url</span><a href="#url" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">url</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
 <div class="tsd-comment tsd-typography"><p>Base URL of the running GoBouncer service, e.g. &quot;<a href="http://localhost:8080">http://localhost:8080</a>&quot;</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/RITIK-KHARYA/gobouncer-package/blob/191a34de3c36a1da81727116b6e24860fe713a26/src/types.ts#L55">src/types.ts:55</a></li></ul></aside></section></section></details></div>
+<li>Defined in <a href="https://github.com/RITIK-KHARYA/gobouncer-package/blob/ee4f2b7f171c47798f106433d571aa8041316e26/src/types.ts#L55">src/types.ts:55</a></li></ul></aside></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">

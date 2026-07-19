@@ -1,0 +1,4 @@
+include docs/python.md
+graft python/gobouncer
+recursive-exclude python/gobouncer/__pycache__ *
+global-exclude *.py[cod]

@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gobouncer"
+version = "0.2.0"
+description = "Python client for the GoBouncer rate limiting service."
+readme = "docs/python.md"
+requires-python = ">=3.10"
+license = "MIT"
+keywords = ["rate-limit", "rate-limiter", "redis", "fastapi", "flask", "django", "gobouncer"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Internet :: WWW/HTTP",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = ["httpx>=0.24"]
+
+[project.optional-dependencies]
+fastapi = ["fastapi>=0.100"]
+flask = ["flask>=2.3"]
+django = ["django>=4.2"]
+test = ["pytest>=8.0"]
+build = ["build>=1.2"]
+
+[project.urls]
+Homepage = "https://github.com/ritik-kharya/gobouncer"
+Repository = "https://github.com/RITIK-KHARYA/gobouncer-package"
+Service = "https://github.com/ritik-kharya/gobouncer"
+
+[tool.setuptools.packages.find]
+where = ["python"]
+include = ["gobouncer*"]
+exclude = ["tests*"]
+
+[tool.setuptools.package-data]
+gobouncer = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["python/tests"]

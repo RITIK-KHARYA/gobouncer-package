@@ -9,6 +9,12 @@ export default [
       'docs/api/**',
       'node_modules/**',
       'coverage/**',
+      '.venv/**',
+      'venv/**',
+      'build/**',
+      'python-dist/**',
+      'python/**/*.egg-info/**',
+      'python/**/__pycache__/**',
       '*.lock',
     ],
   },
@@ -36,7 +42,7 @@ export default [
         ...globals.node,
         ...globals.browser,
       },
-    },  
+    },
   },
   {
     rules: {
