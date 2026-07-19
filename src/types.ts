@@ -21,13 +21,13 @@ export interface PolicyDefinition {
 /** A map of application policy names to policy settings. */
 export type PolicyRegistry = Record<string, PolicyDefinition>;
 
-/** Minimal request shape we depend on — works with Express, Fastify (via req.raw), etc. */
+/** Minimal request shape we depend on - works with Express, Fastify (via req.raw), etc. */
 export interface MinimalRequest {
   ip?: string;
   headers: Record<string, string | string[] | undefined>;
 }
 
-/** Minimal response shape we depend on — matches Express's res object. */
+/** Minimal response shape we depend on - matches Express's res object. */
 export interface MinimalResponse {
   setHeader(name: string, value: string | number): unknown;
   status(code: number): MinimalResponse;
@@ -57,8 +57,8 @@ export interface GoBouncerOptions {
   timeoutMs?: number;
   /**
    * If GoBouncer is unreachable or errors out:
-   *   true  (default) — allow the request through (availability over strictness)
-   *   false            — deny the request (strictness over availability)
+   *   true  (default) - allow the request through (availability over strictness)
+   *   false           - deny the request (strictness over availability)
    */
   failOpen?: boolean;
   /** Optional shared secret sent as `X-GoBouncer-Key` header on every check call. */
@@ -118,15 +118,6 @@ export interface KoaLimitOptions {
   windowMs: number;
   /** How to derive the key for this route. Defaults to limiting by IP. */
   key?: (ctx: KoaContext) => string;
-  /** Which algorithm to use. Defaults to "sliding_window". */
-  algorithm?: Algorithm;
-}
-
-export interface NextLimitOptions {
-  /** Max requests allowed within the window. */
-  max: number;
-  /** Window size in milliseconds. */
-  windowMs: number;
   /** Which algorithm to use. Defaults to "sliding_window". */
   algorithm?: Algorithm;
 }

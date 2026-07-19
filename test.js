@@ -132,7 +132,7 @@ test("GoBouncerClient.checkPolicy() makes successful HTTP post", async (t) => {
   });
 });
 
-test("GoBouncerClient.limit() middleware allowed flow", async (t) => {
+test("GoBouncerClient.limit() middleware allowed flow", async () => {
   const client = gobouncer({ url: "http://localhost:8080" });
   
   // mock check
@@ -162,7 +162,7 @@ test("GoBouncerClient.limit() middleware allowed flow", async (t) => {
   assert.strictEqual(headersSet["X-RateLimit-Remaining"], 5);
 });
 
-test("GoBouncerClient.limit() middleware denied flow", async (t) => {
+test("GoBouncerClient.limit() middleware denied flow", async () => {
   const client = gobouncer({ url: "http://localhost:8080" });
   
   // mock check
@@ -381,9 +381,9 @@ test("GoBouncerClient.use() falls back to server-side named policy", async () =>
   });
 });
 
-// ── Hono middleware tests ─────────────────────────────────────────
+// Hono middleware tests
 
-const { honoLimit, honoPolicy, honoIpKey, honoHeaderKey } = require("./dist/hono.js");
+const { honoLimit, honoPolicy, honoUse, honoIpKey, honoHeaderKey } = require("./dist/hono.js");
 
 /**
  * Create a minimal mock of Hono's Context object.
@@ -439,7 +439,7 @@ test("honoHeaderKey falls back to IP if header is missing", () => {
   assert.strictEqual(keyFn(c), "ip:10.0.0.1");
 });
 
-test("honoLimit allowed flow — sets headers and calls next()", async () => {
+test("honoLimit allowed flow - sets headers and calls next()", async () => {
   const client = gobouncer({ url: "http://localhost:8080" });
   client.check = async () => ({ allowed: true, remaining: 7 });
 
@@ -457,7 +457,7 @@ test("honoLimit allowed flow — sets headers and calls next()", async () => {
   assert.strictEqual(c._responseHeaders["X-RateLimit-Remaining"], "7");
 });
 
-test("honoLimit denied flow — returns 429 with correct body and headers", async () => {
+test("honoLimit denied flow - returns 429 with correct body and headers", async () => {
   const client = gobouncer({ url: "http://localhost:8080" });
   client.check = async () => ({ allowed: false, remaining: 0, retry_after: 3000 });
 
@@ -509,7 +509,6 @@ test("honoLimit uses custom algorithm", async () => {
   const client = gobouncer({ url: "http://localhost:8080" });
 
   let capturedAlgorithm = null;
-  const originalCheck = client.check.bind(client);
   client.check = async (key, max, windowMs, algorithm) => {
     capturedAlgorithm = algorithm;
     return { allowed: true, remaining: 5 };
@@ -579,7 +578,38 @@ test("honoPolicy denied flow", async () => {
   });
 });
 
-// ── New Tests for Phase 2 DX & Observability ───────────────────────
+test("honoUse applies local policy settings", async () => {
+  const client = gobouncer({
+    url: "http://localhost:8080",
+    policies: {
+      profileRead: { algorithm: "gcra", limit: 100, windowMs: 60000 },
+    },
+  });
+
+  let captured = null;
+  client.check = async (key, max, windowMs, algorithm) => {
+    captured = { key, max, windowMs, algorithm };
+    return { allowed: true, remaining: 99 };
+  };
+
+  const middleware = honoUse(client, "profileRead", {
+    key: (c) => `user:${c.req.header("x-user-id")}`,
+  });
+
+  const c = createMockContext({ "x-user-id": "user_123" });
+  let nextCalled = false;
+  await middleware(c, async () => { nextCalled = true; });
+
+  assert.strictEqual(nextCalled, true);
+  assert.deepStrictEqual(captured, {
+    key: "ratelimit:profileRead:gcra:user:user_123",
+    max: 100,
+    windowMs: 60000,
+    algorithm: "gcra",
+  });
+});
+
+// New Tests for Phase 2 DX & Observability
 
 test("GoBouncerClient triggers onError on connection failure", async (t) => {
   let capturedError = null;
@@ -732,9 +762,9 @@ test("honoLimit sets X-RateLimit-Reset when retry_after is present", async () =>
   assert.ok(resetTimestamp > Math.floor(Date.now() / 1000));
 });
 
-// ── Fastify middleware tests ───────────────────────────────────────
+// Fastify middleware tests
 
-const { fastifyLimit, fastifyIpKey, fastifyHeaderKey } = require("./dist/fastify.js");
+const { fastifyLimit, fastifyUse, fastifyIpKey, fastifyHeaderKey } = require("./dist/fastify.js");
 
 function createMockFastify(headers = {}, ip = "1.2.3.4") {
   const responseHeaders = {};
@@ -807,9 +837,31 @@ test("fastifyLimit denied flow", async () => {
   assert.ok(responseHeaders["X-RateLimit-Reset"]);
 });
 
-// ── Koa middleware tests ───────────────────────────────────────────
+test("fastifyUse falls back to server-side named policy", async () => {
+  const client = gobouncer({ url: "http://localhost:8080" });
+  client.checkPolicy = async (key, policy) => ({
+    allowed: false,
+    remaining: 0,
+    retry_after: 3000,
+    policy,
+    limit: 5,
+  });
 
-const { koaLimit, koaIpKey, koaHeaderKey } = require("./dist/koa.js");
+  const hook = fastifyUse(client, "login");
+  const { req, reply, responseHeaders, getStatus, getBody } = createMockFastify();
+
+  await hook(req, reply);
+
+  assert.strictEqual(getStatus(), 429);
+  assert.deepStrictEqual(getBody(), { error: "too many requests", retry_after_ms: 3000 });
+  assert.strictEqual(responseHeaders["X-RateLimit-Policy"], "login");
+  assert.strictEqual(responseHeaders["X-RateLimit-Limit"], "5");
+  assert.strictEqual(responseHeaders["Retry-After"], "3");
+});
+
+// Koa middleware tests
+
+const { koaLimit, koaUse, koaIpKey, koaHeaderKey } = require("./dist/koa.js");
 
 function createMockKoa(headers = {}, ip = "1.2.3.4") {
   const responseHeaders = {};
@@ -873,9 +925,40 @@ test("koaLimit denied flow", async () => {
   assert.strictEqual(responseHeaders["Retry-After"], "3");
 });
 
-// ── Next.js / Edge middleware tests ────────────────────────────────
+test("koaUse applies local policy settings", async () => {
+  const client = gobouncer({
+    url: "http://localhost:8080",
+    policies: {
+      otpVerify: { algorithm: "sliding-window", limit: 5, windowMs: 60000 },
+    },
+  });
 
-const { nextLimit, nextIpKey, nextHeaderKey } = require("./dist/next.js");
+  let captured = null;
+  client.check = async (key, max, windowMs, algorithm) => {
+    captured = { key, max, windowMs, algorithm };
+    return { allowed: true, remaining: 4 };
+  };
+
+  const middleware = koaUse(client, "otpVerify", {
+    key: () => "user:42",
+  });
+  const { ctx } = createMockKoa();
+
+  let nextCalled = false;
+  await middleware(ctx, async () => { nextCalled = true; });
+
+  assert.strictEqual(nextCalled, true);
+  assert.deepStrictEqual(captured, {
+    key: "ratelimit:otpVerify:sliding_window:user:42",
+    max: 5,
+    windowMs: 60000,
+    algorithm: "sliding_window",
+  });
+});
+
+// Next.js / Edge middleware tests
+
+const { nextLimit, nextUse, nextIpKey, nextHeaderKey } = require("./dist/next.js");
 
 function createMockRequest(headersMap = {}, ip = "1.2.3.4") {
   const headers = {
@@ -929,9 +1012,28 @@ test("nextLimit denied flow", async () => {
   assert.deepStrictEqual(body, { error: "too many requests", retry_after_ms: 3000 });
 });
 
-// ── Elysia plugin tests ───────────────────────────────────────────
+test("nextUse falls back to server-side named policy", async () => {
+  const client = gobouncer({ url: "http://localhost:8080" });
+  client.checkPolicy = async (key, policy) => ({
+    allowed: false,
+    remaining: 0,
+    retry_after: 3000,
+    policy,
+    limit: 5,
+  });
 
-const { elysiaLimit, elysiaIpKey, elysiaHeaderKey } = require("./dist/elysia.js");
+  const limit = nextUse(client, "login");
+  const response = await limit(createMockRequest());
+
+  assert.ok(response instanceof globalThis.Response);
+  assert.strictEqual(response.status, 429);
+  assert.strictEqual(response.headers.get("X-RateLimit-Policy"), "login");
+  assert.strictEqual(response.headers.get("X-RateLimit-Limit"), "5");
+});
+
+// Elysia plugin tests
+
+const { elysiaLimit, elysiaUse, elysiaIpKey, elysiaHeaderKey } = require("./dist/elysia.js");
 
 function createMockElysia(headersMap = {}, ip = "1.2.3.4") {
   const responseHeaders = {};
@@ -993,4 +1095,34 @@ test("elysiaLimit denied flow", async () => {
   assert.strictEqual(responseHeaders["X-RateLimit-Remaining"], "0");
   assert.strictEqual(responseHeaders["Retry-After"], "3");
   assert.ok(responseHeaders["X-RateLimit-Reset"]);
+});
+
+test("elysiaUse applies local policy settings", async () => {
+  const client = gobouncer({
+    url: "http://localhost:8080",
+    policies: {
+      profileRead: { algorithm: "gcra", limit: 100, windowMs: 60000 },
+    },
+  });
+
+  let captured = null;
+  client.check = async (key, max, windowMs, algorithm) => {
+    captured = { key, max, windowMs, algorithm };
+    return { allowed: true, remaining: 99 };
+  };
+
+  const hook = elysiaUse(client, "profileRead", {
+    key: () => "user:42",
+  });
+  const { ctx } = createMockElysia();
+
+  const response = await hook(ctx);
+
+  assert.strictEqual(response, undefined);
+  assert.deepStrictEqual(captured, {
+    key: "ratelimit:profileRead:gcra:user:42",
+    max: 100,
+    windowMs: 60000,
+    algorithm: "gcra",
+  });
 });

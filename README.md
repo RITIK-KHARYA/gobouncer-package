@@ -149,6 +149,32 @@ app.listen(3000)
 ## Basic image support for overview 
 ![sample middleware implementation](image.webp)
 
+## API Reference
+
+Generated API docs live in [`docs/api`](docs/api/index.html). Regenerate them with:
+
+```bash
+npm run docs
+```
+
+## Maintainer Workflow
+
+Before publishing, verify the package contents:
+
+```bash
+npm run pack:check
+```
+
+Releases use Changesets:
+
+```bash
+npm run changeset
+npm run version
+npm run release
+```
+
+On `main`, the release workflow opens a version PR when changesets exist. After that PR is merged, it publishes to npm and creates the GitHub release.
+
 ## API
 
 ### `gobouncer(options)`

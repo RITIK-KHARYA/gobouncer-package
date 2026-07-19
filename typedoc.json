@@ -1,0 +1,19 @@
+{
+  "entryPoints": [
+    "src/index.ts",
+    "src/hono.ts",
+    "src/fastify.ts",
+    "src/koa.ts",
+    "src/next.ts",
+    "src/elysia.ts",
+    "src/types.ts",
+    "src/types-hono.ts"
+  ],
+  "out": "docs/api",
+  "cleanOutputDir": true,
+  "readme": "docs/README.md",
+  "entryPointStrategy": "expand",
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "hideGenerator": true
+}

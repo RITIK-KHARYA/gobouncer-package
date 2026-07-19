@@ -1,5 +1,5 @@
 /**
- * GoBouncer — Hono middleware adapter.
+ * GoBouncer - Hono middleware adapter.
  *
  * This module provides a Hono-native middleware factory that wraps the
  * framework-agnostic GoBouncerClient.check() method. Import from
@@ -16,9 +16,10 @@
 
 import type { Context, Next, MiddlewareHandler } from 'hono';
 import { GoBouncerClient } from './index';
+import { namespacedPolicyKey, normalizePolicyAlgorithm } from './policy-utils';
 import type { HonoKeyFunc, HonoLimitOptions, HonoPolicyOptions } from './types-hono';
 
-/** Default key — extract client IP from standard proxy headers. */
+/** Default key - extract client IP from standard proxy headers. */
 export const honoIpKey: HonoKeyFunc = (c) => {
   const forwarded = c.req.header('x-forwarded-for');
   const ip = forwarded?.split(',')[0]?.trim()
@@ -35,7 +36,7 @@ export function honoHeaderKey(headerName: string): HonoKeyFunc {
   };
 }
 
-// ── Middleware factory ─────────────────────────────────────────────
+// Middleware factory
 
 /**
  * Create a Hono middleware from an existing GoBouncerClient.
@@ -124,4 +125,26 @@ export function honoPolicy(
 
     await next();
   };
+}
+
+export function honoUse(
+  client: GoBouncerClient,
+  name: string,
+  opts: Omit<HonoPolicyOptions, 'name'> = {}
+): MiddlewareHandler {
+  const policy = client.policies?.[name];
+
+  if (!policy) {
+    return honoPolicy(client, { ...opts, name });
+  }
+
+  const algorithm = normalizePolicyAlgorithm(policy.algorithm);
+  const keyFn = opts.key ?? honoIpKey;
+
+  return honoLimit(client, {
+    max: policy.limit,
+    windowMs: policy.windowMs,
+    algorithm,
+    key: (c) => namespacedPolicyKey(name, algorithm, keyFn(c)),
+  });
 }

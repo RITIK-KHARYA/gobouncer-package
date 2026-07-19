@@ -1,8 +1,9 @@
 import type { Context } from 'elysia';
 import { GoBouncerClient } from './index';
+import { namespacedPolicyKey, normalizePolicyAlgorithm } from './policy-utils';
 import type { ElysiaLimitOptions } from './types';
 
-/** Default key function — limits by client IP address. */
+/** Default key function - limits by client IP address. */
 export const elysiaIpKey = (c: Context): string => {
   const forwarded = c.request.headers.get('x-forwarded-for');
   const ip = forwarded?.split(',')[0]?.trim()
@@ -51,6 +52,53 @@ export function elysiaLimit(
 
     c.set.headers['X-RateLimit-Limit'] = String(opts.max);
     c.set.headers['X-RateLimit-Remaining'] = String(result.remaining);
+
+    if (result.retry_after !== undefined) {
+      const resetEpochSec = Math.ceil((Date.now() + result.retry_after) / 1000);
+      c.set.headers['X-RateLimit-Reset'] = String(resetEpochSec);
+    }
+
+    if (!result.allowed) {
+      const retryAfterSec = Math.max(1, Math.ceil((result.retry_after ?? 0) / 1000));
+      c.set.headers['Retry-After'] = String(retryAfterSec);
+      c.set.status = 429;
+      return {
+        error: 'too many requests',
+        retry_after_ms: result.retry_after ?? 0,
+      };
+    }
+  };
+}
+
+export function elysiaUse(
+  client: GoBouncerClient,
+  name: string,
+  opts: Pick<ElysiaLimitOptions, 'key'> = {}
+) {
+  const policy = client.policies?.[name];
+
+  if (policy) {
+    const algorithm = normalizePolicyAlgorithm(policy.algorithm);
+    const keyFn = opts.key ?? elysiaIpKey;
+
+    return elysiaLimit(client, {
+      max: policy.limit,
+      windowMs: policy.windowMs,
+      algorithm,
+      key: (c) => namespacedPolicyKey(name, algorithm, keyFn(c)),
+    });
+  }
+
+  const keyFn = opts.key ?? elysiaIpKey;
+
+  return async (c: Context) => {
+    const result = await client.checkPolicy(keyFn(c), name);
+
+    c.set.headers['X-RateLimit-Policy'] = result.policy ?? name;
+    c.set.headers['X-RateLimit-Remaining'] = String(result.remaining);
+    if (result.limit !== undefined) {
+      c.set.headers['X-RateLimit-Limit'] = String(result.limit);
+    }
 
     if (result.retry_after !== undefined) {
       const resetEpochSec = Math.ceil((Date.now() + result.retry_after) / 1000);

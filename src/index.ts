@@ -1,5 +1,5 @@
 /**
- * GoBouncer — Node.js client for the GoBouncer rate limiting service.
+ * GoBouncer - Node.js client for the GoBouncer rate limiting service.
  *
  * GoBouncer itself is a Go service backed by Redis. This package is a thin,
  * dependency-free client that talks to it over HTTP and exposes an
@@ -15,13 +15,13 @@ import {
   LimitOptions,
   MinimalRequest,
   MinimalResponse,
-  PolicyDefinition,
   PolicyOptions,
 } from "./types";
+import { namespacedPolicyKey, normalizePolicyAlgorithm } from "./policy-utils";
 
-// ── Default key function ──────────────────────────────────────────
+// Default key function
 
-/** Default key function — limits by client IP address. */
+/** Default key function - limits by client IP address. */
 export const ipKey: KeyFunc = (req) => `ip:${req.ip ?? "unknown"}`;
 
 /** Build a key function that reads a specific header (falls back to IP if missing). */
@@ -34,15 +34,7 @@ export function headerKey(headerName: string): KeyFunc {
   };
 }
 
-function normalizeAlgorithm(algorithm: PolicyDefinition["algorithm"]): Algorithm {
-  return algorithm === "sliding-window" ? "sliding_window" : algorithm ?? "sliding_window";
-}
-
-function namespacedKey(policyName: string, algorithm: Algorithm, key: string): string {
-  return `ratelimit:${policyName}:${algorithm}:${key}`;
-}
-
-// ── Client ─────────────────────────────────────────────────────────
+// Client
 
 export class GoBouncerClient {
   public readonly url: string;
@@ -63,7 +55,7 @@ export class GoBouncerClient {
 
   /**
    * Ask GoBouncer whether this key should be allowed right now.
-   * Never throws — on any failure it resolves according to `failOpen`.
+   * Never throws - on any failure it resolves according to `failOpen`.
    */
   async check(
     key: string,
@@ -128,7 +120,9 @@ export class GoBouncerClient {
       if (this.onError) {
         try {
           this.onError(err instanceof Error ? err : new Error(String(err)));
-        } catch {}
+        } catch {
+          // Ignore errors in the error callback
+        }
       }
       // network error, timeout, GoBouncer down, etc.
       return this.fallback();
@@ -281,19 +275,19 @@ export class GoBouncerClient {
       return this.policy({ ...opts, name });
     }
 
-    const algorithm = normalizeAlgorithm(policy.algorithm);
+    const algorithm = normalizePolicyAlgorithm(policy.algorithm);
     const keyFn = opts.key ?? (ipKey as KeyFunc<Req>);
 
     return this.limit({
       max: policy.limit,
       windowMs: policy.windowMs,
       algorithm,
-      key: (req: Req) => namespacedKey(name, algorithm, keyFn(req)),
+      key: (req: Req) => namespacedPolicyKey(name, algorithm, keyFn(req)),
     });
   }
 }
 
-// ── Factory function — the main entry point most users will reach for ──
+// Factory function - the main entry point most users will reach for
 
 /**
  * Create a GoBouncer client.

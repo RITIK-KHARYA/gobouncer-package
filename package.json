@@ -42,10 +42,10 @@
     "dist"
   ],
   "peerDependencies": {
-    "hono": ">=4.0.0",
+    "elysia": ">=1.0.0",
     "fastify": ">=4.0.0",
-    "koa": ">=2.0.0",
-    "elysia": ">=1.0.0"
+    "hono": ">=4.0.0",
+    "koa": ">=2.0.0"
   },
   "peerDependenciesMeta": {
     "hono": {
@@ -64,6 +64,13 @@
   "scripts": {
     "build": "tsup",
     "type-check": "tsc --noEmit",
+    "lint": "eslint . --ext .js,.ts",
+    "lint:fix": "npm run lint -- --fix",
+    "docs": "typedoc",
+    "pack:check": "npm run build && npm pack --dry-run",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "npm run build && npm publish --access public --provenance",
     "test": "npm run build && node test.js",
     "prepublishOnly": "npm run build"
   },
@@ -79,20 +86,23 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@changesets/cli": "^2.31.1",
+    "@eslint/js": "^10.0.1",
     "@types/koa": "^3.0.3",
     "@types/node": "^20.14.0",
     "elysia": "^1.4.29",
+    "eslint": "^10.7.0",
     "fastify": "^5.10.0",
+    "globals": "^17.7.0",
     "hono": "^4.12.28",
     "koa": "^3.2.1",
     "tsup": "^8.5.1",
-    "typescript": "^5.5.4"
+    "typedoc": "^0.28.20",
+    "typescript": "^5.5.4",
+    "typescript-eslint": "^8.64.0"
   },
   "engines": {
     "node": ">=18.0.0"
-  },
-  "bin": {
-    "gobouncer": "./bin/cli.js"
   },
   "dependencies": {
     "makefile": "^0.0.2"
