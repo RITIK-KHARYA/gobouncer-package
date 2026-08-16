@@ -2,6 +2,14 @@
   "name": "gobouncer",
   "version": "0.2.0",
   "description": "Drop-in rate limiting middleware for Node.js, backed by the GoBouncer Go service.",
+  "homepage": "https://github.com/RITIK-KHARYA/gobouncer-package#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RITIK-KHARYA/gobouncer-package.git"
+  },
+  "bugs": {
+    "url": "https://github.com/RITIK-KHARYA/gobouncer-package/issues"
+  },
   "type": "commonjs",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -42,10 +50,10 @@
     "dist"
   ],
   "peerDependencies": {
-    "elysia": ">=1.0.0",
-    "fastify": ">=4.0.0",
     "hono": ">=4.0.0",
-    "koa": ">=2.0.0"
+    "fastify": ">=4.0.0",
+    "koa": ">=2.0.0",
+    "elysia": ">=1.0.0"
   },
   "peerDependenciesMeta": {
     "hono": {
@@ -77,10 +85,24 @@
   "keywords": [
     "rate-limit",
     "rate-limiter",
+    "rate-limiting",
     "express",
     "hono",
+    "fastify",
+    "koa",
+    "nextjs",
+    "elysia",
     "middleware",
     "redis",
+    "go",
+    "golang",
+    "sliding-window",
+    "gcra",
+    "api-rate-limit",
+    "python",
+    "fastapi",
+    "flask",
+    "django",
     "gobouncer"
   ],
   "author": "",

@@ -1,8 +1,13 @@
-# gobouncer
+﻿# gobouncer
 
-Drop-in rate limiting middleware for Node.js, backed by the [GoBouncer](https://github.com/ritik-kharya/gobouncer) Go service.
+Drop-in SDKs and middleware for backend applications using the [GoBouncer](https://github.com/ritik-kharya/gobouncer) Go service.
 
-GoBouncer itself runs as a small, fast Go service backed by Redis. This package is a thin client — it does no rate limiting math itself, it just talks to your running GoBouncer instance over HTTP and gives you an Express-style middleware.
+GoBouncer has two parts:
+
+- [gobouncer](https://github.com/ritik-kharya/gobouncer): the Go + Redis rate-limit service.
+- [gobouncer-package](https://github.com/RITIK-KHARYA/gobouncer-package): SDKs for application backends using that service.
+
+GoBouncer itself runs as a small, fast Go service backed by Redis. This package is a thin client - it does no rate limiting math itself, it just talks to your running GoBouncer instance over HTTP and gives you framework-friendly middleware.
 
 ## Install
 
@@ -141,7 +146,7 @@ const app = express()
 // Create once, reuse everywhere
 const limiter = gobouncer({ url: 'http://localhost:8080' })
 
-// Apply globally — 100 requests per minute per IP
+// Apply globally â€” 100 requests per minute per IP
 app.use(limiter.limit({ max: 100, windowMs: 60_000 }))
 
 // Stricter limit on a sensitive route using a named GoBouncer policy
@@ -207,11 +212,11 @@ Creates a client.
 
 | Option      | Type      | Default          | Description                                            |
 | ----------- | --------- | ---------------- | -------------------------------------------------------- |
-| `url`       | `string`  | —                | Base URL of your running GoBouncer service              |
+| `url`       | `string`  | â€”                | Base URL of your running GoBouncer service              |
 | `timeoutMs` | `number`  | `150`            | Max time to wait for a response                          |
 | `failOpen`  | `boolean` | `true`           | Allow requests through if GoBouncer is unreachable        |
-| `apiKey`    | `string`  | —                | Optional shared secret sent as `X-GoBouncer-Key`         |
-| `onError`   | `function` | —               | Optional `(err: Error) => void` triggered on failures    |
+| `apiKey`    | `string`  | â€”                | Optional shared secret sent as `X-GoBouncer-Key`         |
+| `onError`   | `function` | â€”               | Optional `(err: Error) => void` triggered on failures    |
 
 ### `limiter.limit(options)`
 
@@ -219,8 +224,8 @@ Returns an Express-style middleware `(req, res, next) => void`.
 
 | Option      | Type                  | Default            | Description                                  |
 | ----------- | --------------------- | ------------------- | --------------------------------------------- |
-| `max`       | `number`              | —                    | Max requests allowed per window               |
-| `windowMs`  | `number`              | —                    | Window size in milliseconds                   |
+| `max`       | `number`              | â€”                    | Max requests allowed per window               |
+| `windowMs`  | `number`              | â€”                    | Window size in milliseconds                   |
 | `key`       | `(req) => string`     | limits by client IP | How to identify the caller                    |
 | `algorithm` | `'sliding_window'` \| `'gcra'` | `'sliding_window'`  | Which algorithm GoBouncer should use          |
 
@@ -250,7 +255,7 @@ if (!isOnline) {
 
 ### `limiter.check(key, max, windowMs, algorithm?)`
 
-Call GoBouncer directly without the middleware wrapper — useful for protecting non-HTTP code paths, like before enqueuing a BullMQ job:
+Call GoBouncer directly without the middleware wrapper â€” useful for protecting non-HTTP code paths, like before enqueuing a BullMQ job:
 
 ```ts
 const result = await limiter.check(`enqueue:${userId}`, 10, 60_000)
@@ -346,7 +351,7 @@ By default (`failOpen: true`), requests pass through if GoBouncer can't be reach
 
 ## Hono.js
 
-The package ships a dedicated Hono adapter via the `gobouncer/hono` sub-path export. No extra dependencies — Hono is an optional peer dependency.
+The package ships a dedicated Hono adapter via the `gobouncer/hono` sub-path export. No extra dependencies â€” Hono is an optional peer dependency.
 
 ### Quick start (Hono)
 
@@ -359,7 +364,7 @@ const app = new Hono()
 
 const limiter = gobouncer({ url: 'http://localhost:8080' })
 
-// Global — 100 requests per minute per IP
+// Global â€” 100 requests per minute per IP
 app.use('*', honoLimit(limiter, { max: 100, windowMs: 60_000 }))
 
 // Stricter limit on a sensitive route using a named policy
@@ -396,8 +401,8 @@ Returns a Hono-compatible middleware `MiddlewareHandler`.
 
 | Option      | Type                  | Default            | Description                                  |
 | ----------- | --------------------- | ------------------- | --------------------------------------------- |
-| `max`       | `number`              | —                    | Max requests allowed per window               |
-| `windowMs`  | `number`              | —                    | Window size in milliseconds                   |
+| `max`       | `number`              | â€”                    | Max requests allowed per window               |
+| `windowMs`  | `number`              | â€”                    | Window size in milliseconds                   |
 | `key`       | `(c: Context) => string` | limits by client IP | How to identify the caller                |
 | `algorithm` | `'sliding_window'` \| `'gcra'` | `'sliding_window'`  | Which algorithm GoBouncer should use  |
 
@@ -426,8 +431,8 @@ honoLimit(limiter, { max: 100, windowMs: 60_000, key: honoIpKey })
 honoLimit(limiter, { max: 100, windowMs: 60_000, key: honoHeaderKey('X-API-Key') })
 ```
 
-- **`honoIpKey(c)`** — reads `x-forwarded-for` → `x-real-ip` → `'unknown'`
-- **`honoHeaderKey(headerName)`** — reads the given header, falls back to `honoIpKey`
+- **`honoIpKey(c)`** â€” reads `x-forwarded-for` â†’ `x-real-ip` â†’ `'unknown'`
+- **`honoHeaderKey(headerName)`** â€” reads the given header, falls back to `honoIpKey`
 
 ---
 
